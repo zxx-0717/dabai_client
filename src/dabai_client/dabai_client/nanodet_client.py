@@ -20,15 +20,18 @@ class DaBaiSubscriber(Node):
 
         def __init__(self):
                 super().__init__('DaBai_Subscriber')
+                self.K = None
                 self.depth_data = []
                 self.color_subscription = self.create_subscription(Image,'/camera/color/image_raw',
                 self.color_subscription_callback,qos_profile_sensor_data)
                 self.color_subscription  # prevent unused variable warning
 
-                self.depth_subscription = self.create_subscription(PointCloud2,'/camera/depth/points',
+                self.depth_subscription = self.create_subscription(Image,'/camera/depth/image_raw',
                 self.depth_subscription_callback,
                 qos_profile_sensor_data)
                 self.depth_subscription  # prevent unused variable warning
+
+                self.camera_info_subscription = self.create_subscription(CameraInfo, 'camera/depth/camera_info', self.camera_info_subscription_callback,qos_profile_sensor_data)
 
                 self.pub_pose = self.create_publisher(DetectResult, '/person_detected', 2)
 
@@ -83,7 +86,7 @@ class DaBaiSubscriber(Node):
                 det_classid = det_classid[det_classid == 0]
                 msg = DetectResult()
                 
-                if len(det_classid) > 0 and len(self.depth_data) > 0:
+                if all(len(det_classid) > 0 and len(self.depth_data) > 0 and (self.K != None)):
                         self.srcimg = img_draw(self.srcimg,det_bboxes, det_conf, det_classid,newh, neww, top, left)
                         center_point_x = (det_bboxes[:,2] - det_bboxes[:,0]).reshape((-1,1)).astype(int)
                         center_point_y = (det_bboxes[:,3]-det_bboxes[:,1]).reshape((-1,1)).astype(int)
@@ -94,35 +97,40 @@ class DaBaiSubscriber(Node):
                         print(center_point)
                         
                         for x,y in center_point:
+                                x = 320
+                                y = 240
                                 single_msg = SingleDetector() 
-                                x_ = self.depth_data[y][x][:4]
-                                y_ = self.depth_data[y][x][4:8]
-                                z_ = self.depth_data[y][x][8:12]
-                                depth_x = unpack("<f",pack('4B',*x_))[0]
-                                depth_y = unpack("<f",pack('4B',*y_))[0]
-                                depth_z = unpack("<f",pack('4B',*z_))[0]
-                                print(depth_x,depth_y,depth_z)
-                                print(type(depth_z))
-                                if np.isnan(depth_z):
-                                        single_msg.part = False
-                                        single_msg.x = 100.
-                                        single_msg.y = 100.
-                                        single_msg.z = 100.
-                                        msg.result.append(single_msg) 
-                                else: 
-                                        single_msg.part = False
-                                        single_msg.x = depth_z
-                                        single_msg.y = depth_y
-                                        single_msg.z = depth_x 
-                                        msg.result.append(single_msg)                             
-                else:
-                        single_msg = SingleDetector() 
-                        single_msg.part = False
-                        single_msg.x = 100.
-                        single_msg.y = 100.
-                        single_msg.z = 100.
-                        msg.result.append(single_msg) 
-                self.pub_pose.publish(msg)
+                                z_ = self.depth_data[y][x][1]*256 + self.depth_data[y][x][0]
+                                x_ = (x - self.K[2]) / self.K[0] * z_
+                                y_ = (y - self.K[5]) / self.K[4] * z_
+                                # x_ = self.depth_data[y][x][:4]
+                                # y_ = self.depth_data[y][x][4:8]
+                                # z_ = self.depth_data[y][x][8:12]
+                                # depth_x = unpack("<f",pack('4B',*x_))[0]
+                                # depth_y = unpack("<f",pack('4B',*y_))[0]
+                                # depth_z = unpack("<f",pack('4B',*z_))[0]
+                                print('------------------>',x_,y_,z_)
+                #                 print(type(depth_z))
+                #                 if np.isnan(depth_z):
+                #                         single_msg.part = False
+                #                         single_msg.x = 100.
+                #                         single_msg.y = 100.
+                #                         single_msg.z = 100.
+                #                         msg.result.append(single_msg) 
+                #                 else: 
+                #                         single_msg.part = False
+                #                         single_msg.x = depth_z
+                #                         single_msg.y = depth_y
+                #                         single_msg.z = depth_x 
+                #                         msg.result.append(single_msg)                             
+                # else:
+                #         single_msg = SingleDetector() 
+                #         single_msg.part = False
+                #         single_msg.x = 100.
+                #         single_msg.y = 100.
+                #         single_msg.z = 100.
+                #         msg.result.append(single_msg) 
+                # self.pub_pose.publish(msg)
 
                 # print(det_bboxes)
                 # print(det_conf)
@@ -165,6 +173,9 @@ class DaBaiSubscriber(Node):
                 #         depth_y = unpack("<f",pack('4B',*y_))[0]
                 #         depth_z = unpack("<f",pack('4B',*z_))[0]
                 #         print(depth_x,depth_y,depth_z)
+
+        def camera_info_subscription_callback(self, msg):
+                self.K = msg.k
 
 
 
