@@ -14,6 +14,7 @@
 
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
+  <depend>capella_ros_msg</depend>
 
 
   <export>
