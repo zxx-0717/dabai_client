@@ -46,7 +46,14 @@ class DaBaiSubscriber(Node):
                 self.tcpClient = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 # 连接远程ip
                 print('------正在连接计算棒TCP服务------')
-                self.tcpClient.connect(ADDRESS)
+                while True:
+                        try:
+                                self.tcpClient.connect(ADDRESS)
+                                break
+                        except:
+                                print('wait for TCP server!')
+                                time.sleep(1)
+                                continue
                 print('------已连接计算棒TCP服务------')
 
 
@@ -86,68 +93,57 @@ class DaBaiSubscriber(Node):
                 det_classid = det_classid[det_classid == 0]
                 msg = DetectResult()
                 
-                if all(len(det_classid) > 0 and len(self.depth_data) > 0 and (self.K != None)):
-                        self.srcimg = img_draw(self.srcimg,det_bboxes, det_conf, det_classid,newh, neww, top, left)
-                        center_point_x = (det_bboxes[:,2] - det_bboxes[:,0]).reshape((-1,1)).astype(int)
-                        center_point_y = (det_bboxes[:,3]-det_bboxes[:,1]).reshape((-1,1)).astype(int)
-                        center_point = np.concatenate([center_point_x,center_point_y],axis=1)
-                        # print(center_point_x)
-                        # print(center_point_y)
-                        # center_point = np.array([[240,320]])
-                        print(center_point)
-                        
-                        for x,y in center_point:
-                                x = 320
-                                y = 240
-                                single_msg = SingleDetector() 
-                                z_ = self.depth_data[y][x][1]*256 + self.depth_data[y][x][0]
-                                x_ = (x - self.K[2]) / self.K[0] * z_
-                                y_ = (y - self.K[5]) / self.K[4] * z_
-                                # x_ = self.depth_data[y][x][:4]
-                                # y_ = self.depth_data[y][x][4:8]
-                                # z_ = self.depth_data[y][x][8:12]
-                                # depth_x = unpack("<f",pack('4B',*x_))[0]
-                                # depth_y = unpack("<f",pack('4B',*y_))[0]
-                                # depth_z = unpack("<f",pack('4B',*z_))[0]
-                                print('------------------>',x_,y_,z_)
-                #                 print(type(depth_z))
-                #                 if np.isnan(depth_z):
-                #                         single_msg.part = False
-                #                         single_msg.x = 100.
-                #                         single_msg.y = 100.
-                #                         single_msg.z = 100.
-                #                         msg.result.append(single_msg) 
-                #                 else: 
-                #                         single_msg.part = False
-                #                         single_msg.x = depth_z
-                #                         single_msg.y = depth_y
-                #                         single_msg.z = depth_x 
-                #                         msg.result.append(single_msg)                             
-                # else:
-                #         single_msg = SingleDetector() 
-                #         single_msg.part = False
-                #         single_msg.x = 100.
-                #         single_msg.y = 100.
-                #         single_msg.z = 100.
-                #         msg.result.append(single_msg) 
-                # self.pub_pose.publish(msg)
-
-                # print(det_bboxes)
-                # print(det_conf)
-                # print(det_classid)
-                # cv2.imshow('result',result_img)
-                # cv2.waitKey(0)
-                # cv2.destroyAllwindows()
-                # cv2.imwrite(r'/workspaces/rknn-toolkit/nanodet-client/img3_result.jpg',result_img)
-                #     # 计算发送完成的延时
+                single_msg = SingleDetector() 
+                single_msg.part = False
+                single_msg.x = 100.
+                single_msg.y = 100.
+                single_msg.z = 100.
+                msg.result.append(single_msg) 
                 
-
-
-                # self.get_logger().info('color_height: "%s"' % self.color_height)
-                # self.get_logger().info('color_width: "%s"' % self.color_width)
-                # self.get_logger().info('data: "%s"' % self.data)
-                cv2.imshow('img',self.srcimg)
-                # cv2.imshow('img',self.srcimg)
+                if (len(det_classid) > 0):
+                        if(len(self.depth_data) > 0):
+                                if(self.K != []):
+                                        msg.result.clear()
+                                        self.srcimg = img_draw(self.srcimg,det_bboxes, det_conf, det_classid,newh, neww, top, left)
+                                        center_point_x = ((det_bboxes[:,2] + det_bboxes[:,0])/2).reshape((-1,1)).astype(int)
+                                        center_point_y = ((det_bboxes[:,3]+det_bboxes[:,1])/2).reshape((-1,1)).astype(int)
+                                        center_point = np.concatenate([center_point_x,center_point_y],axis=1)
+                                        # print(center_point_x)
+                                        # print(center_point_y)
+                                        # center_point = np.array([[240,320]])
+                                        print(center_point)
+                                        
+                                        for x,y in center_point:
+                                                # x = 320
+                                                # y = 240
+                                                single_msg = SingleDetector() 
+                                                y = int(480 / 416 * y)
+                                                x = int(640 / 416 * x)
+                                                z_ = self.depth_data[y][x][1]*256 + self.depth_data[y][x][0]
+                                                x_ = (x - self.K[2]) / self.K[0] * z_
+                                                y_ = (y - self.K[5]) / self.K[4] * z_
+                                                # x_ = self.depth_data[y][x][:4]
+                                                # y_ = self.depth_data[y][x][4:8]
+                                                # z_ = self.depth_data[y][x][8:12]
+                                                # depth_x = unpack("<f",pack('4B',*x_))[0]
+                                                # depth_y = unpack("<f",pack('4B',*y_))[0]
+                                                # depth_z = unpack("<f",pack('4B',*z_))[0]
+                                                print('------------------>',x_,y_,z_)
+                                                single_msg.part = False
+                                                if z_== 0:
+                                                        single_msg.part = False
+                                                        single_msg.x = 100.
+                                                        single_msg.y = 100.
+                                                        single_msg.z = 100.
+                                                        msg.result.append(single_msg)
+                                                else:
+                                                        single_msg.x = z_ / 1000.
+                                                        single_msg.y = x_ / 1000.
+                                                        single_msg.z = y_ / 1000.
+                                                        msg.result.append(single_msg)
+                
+                self.pub_pose.publish(msg)
+                cv2.imshow('img',self.srcimg)                
                 cv2.waitKey(1)
 
         def depth_subscription_callback(self, msg):
